@@ -4,11 +4,10 @@ interface Env {
   DMX_API_KEY: string;
 }
 
-// Cloudflare 处理 POST 请求的固定写法: onRequestPost
 export const onRequestPost = async (context: any) => {
   const { request, env } = context;
 
-  // 1. 获取密钥 (Cloudflare 从 env 中读取，而不是 process.env)
+  // 1. 安全检查：是否有密钥
   const apiKey = env.DMX_API_KEY;
   if (!apiKey) {
     return new Response(JSON.stringify({ error: "服务端未配置 DMX_API_KEY" }), {
@@ -18,12 +17,10 @@ export const onRequestPost = async (context: any) => {
   }
 
   try {
-    // 2. 解析前端发来的数据
     const prefs = await request.json();
 
-    // ==========================================
-    // 提示词逻辑 (和之前一样)
-    // ==========================================
+    // 2. 准备提示词
+    // @ts-ignore
     const flavorIntensityDesc = Object.entries(prefs.flavorLevels || {})
         // @ts-ignore
         .map(([flavor, level]) => `${flavor}: ${level}%`).join(', ');
@@ -36,15 +33,16 @@ export const onRequestPost = async (context: any) => {
       (请严格返回 JSON)
     `;
 
-    // 3. 转发给 DMXAPI
-    const model = "gemini-2.5-flash";
+    // ---------------------------------------------------------
+    // 🔧 修复点 1: 修改正确的模型名称 (1.5-flash)
+    // ---------------------------------------------------------
+    const model = "gemini-1.5-flash"; 
     const apiUrl = `https://www.dmxapi.cn/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const textPayload = {
       contents: [{ role: "user", parts: [{ text: textPrompt }] }],
       generationConfig: {
         responseMimeType: "application/json",
-        // 简化的 Schema，防止报错
         responseSchema: {
            type: "OBJECT",
            properties: {
@@ -68,11 +66,20 @@ export const onRequestPost = async (context: any) => {
 
     if (!apiResp.ok) {
         const errText = await apiResp.text();
-        return new Response(JSON.stringify({ error: `DMXAPI Error: ${errText}` }), { status: 500 });
+        // 这里把错误详情返回给前端，方便调试
+        return new Response(JSON.stringify({ error: `API请求失败 (${apiResp.status}): ${errText}` }), { status: 500 });
     }
 
     const data: any = await apiResp.json();
-    const recipeJsonStr = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    let recipeJsonStr = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    // ---------------------------------------------------------
+    // 🔧 修复点 2: 增强 JSON 解析 (防止 AI 虽然返回 JSON 但带着 ```json 标记)
+    // ---------------------------------------------------------
+    if (recipeJsonStr) {
+      recipeJsonStr = recipeJsonStr.replace(/```json|```/g, '').trim();
+    }
+
     const recipeData = JSON.parse(recipeJsonStr);
 
     // 4. 返回结果
@@ -85,6 +92,7 @@ export const onRequestPost = async (context: any) => {
     });
 
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    // 捕获所有未知错误
+    return new Response(JSON.stringify({ error: `服务器内部错误: ${err.message}` }), { status: 500 });
   }
 };
