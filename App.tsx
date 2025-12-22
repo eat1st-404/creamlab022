@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { generateCreamRecipe } from './services/geminiService';
+import { generateCreamRecipe } from './services/creamService';
 import { FlavorPreference, UserPreferences, CreamRecipe } from './types';
 import { RecipeCard } from './components/RecipeCard';
 
