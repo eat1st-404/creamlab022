@@ -36,7 +36,7 @@ export const onRequestPost = async (context: any) => {
     // ---------------------------------------------------------
     // 🔧 修复点 1: 修改正确的模型名称 (1.5-flash)
     // ---------------------------------------------------------
-    const model = "gemini-1.5-flash"; 
+    const model = "gemini-2.5-flash"; 
     const apiUrl = `https://www.dmxapi.cn/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     const textPayload = {
@@ -96,3 +96,4 @@ export const onRequestPost = async (context: any) => {
     return new Response(JSON.stringify({ error: `服务器内部错误: ${err.message}` }), { status: 500 });
   }
 };
+
